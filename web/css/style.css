@@ -1,0 +1,195 @@
+:root {
+    --bg: #0f1724;
+    --card: #0b1220;
+    --muted: #94a3b8;
+    --accent: #22c55e;
+    --danger: #ef4444;
+    --text: #e6eef8;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Roboto, "Helvetica Neue", Arial;
+}
+
+body {
+    background: linear-gradient(180deg, #071024 0%, #081427 100%);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.app {
+    width: 100%;
+    max-width: 980px;
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 6px 30px rgba(2, 6, 23, .6);
+    padding: 18px;
+}
+
+.top {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.top input,
+.top button,
+.controls input {
+    background: transparent;
+    border: 1px solid #112033;
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+}
+
+.top input::placeholder {
+    color: var(--muted)
+}
+
+.top button {
+    cursor: pointer;
+    border: none;
+    background: var(--accent);
+    color: #042014;
+    font-weight: 600;
+    padding: 9px 12px;
+}
+
+.top button.disconnect {
+    background: transparent;
+    border: 1px solid #2b3b49;
+    color: var(--muted);
+}
+
+.main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 12px;
+}
+
+.sidebar {
+    border-radius: 8px;
+    padding: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+    min-height: 420px;
+}
+
+.rooms {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.room {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    color: var(--muted);
+}
+
+.room.active {
+    background: #071826;
+    color: var(--text);
+    border-color: #123245;
+    font-weight: 600;
+}
+
+.panel {
+    border-radius: 8px;
+    padding: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.02));
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+}
+
+.messages {
+    overflow: auto;
+    flex: 1;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.message {
+    padding: 8px 10px;
+    border-radius: 8px;
+    max-width: 70%;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.me {
+    align-self: flex-end;
+    background: linear-gradient(180deg, #093b22, #052b19);
+    color: #eaffef;
+}
+
+.meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+
+.composer {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.composer input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #102233;
+    color: var(--text);
+}
+
+.composer button {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #042014;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.small {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.history-btn {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid #112233;
+    padding: 8px 10px;
+    border-radius: 8px;
+}
+
+#messageInput {
+    color: rgba(0, 0, 0, 0.87);
+}

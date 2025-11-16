@@ -10,6 +10,7 @@ import (
 	"github.com/QuatroQuatros/go-real-time-chat/internal/chat"
 	"github.com/QuatroQuatros/go-real-time-chat/internal/domain"
 	"github.com/QuatroQuatros/go-real-time-chat/internal/repository"
+	"github.com/QuatroQuatros/go-real-time-chat/web"
 )
 
 func main() {
@@ -25,6 +26,14 @@ func main() {
 	go hub.Run()
 
 	mux := http.NewServeMux()
+	// ------------------------------
+	// 🔥 Serve arquivos estáticos
+	// ------------------------------
+	mux.Handle("/", http.FileServer(http.FS(web.StaticFS)))
+
+	// ------------------------------
+	// Rotas da API
+	// ------------------------------
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
