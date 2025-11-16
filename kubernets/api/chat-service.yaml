@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat-service # <-- **Este nome DEVE ser o mesmo referenciado no Ingress**
+spec:
+  selector:
+    app: chat-api # <-- **Este rótulo DEVE corresponder ao rótulo no seu Deployment**
+  ports:
+    - protocol: TCP
+      port: 8080 # <-- Porta que o Service expõe (referenciada no Ingress)
+      targetPort: 8080 # <-- Porta que o Container está escutando
+  type: ClusterIP # Tipo padrão para tráfego interno
