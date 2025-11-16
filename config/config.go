@@ -10,8 +10,8 @@ import (
 
 type Config struct {
 	AppEnv     string `envconfig:"APP_ENV" envDefault:"development"`
-	Host       string `envconfig:"DB_SERVER" envDefault:"localhost"`
-	Port       string `envconfig:"DB_PORT" envDefault:"5432"`
+	Host       string `envconfig:"DB_SERVER"`
+	Port       string `envconfig:"DB_PORT"`
 	Username   string `envconfig:"DB_USERNAME"`
 	Password   string `envconfig:"DB_PASSWORD"`
 	Database   string `envconfig:"DB_NAME"`

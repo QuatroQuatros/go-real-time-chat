@@ -13,9 +13,9 @@ import (
 var DB *gorm.DB
 
 func Connect() {
-	host := os.Getenv("DB_HOST")
+	host := os.Getenv("DB_SERVER")
 	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
+	user := os.Getenv("DB_USERNAME")
 	password := os.Getenv("DB_PASSWORD")
 	dbname := os.Getenv("DB_NAME")
 

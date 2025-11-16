@@ -16,7 +16,7 @@ WORKDIR /
 
 COPY --from=builder /chat-server /chat-server
 COPY --from=builder /seeder /seeder
-#COPY .env .
+COPY .env .
 
 EXPOSE 8080
 
