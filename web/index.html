@@ -7,7 +7,13 @@
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <div class="app">
+
+    <div class="login-screen" id="loginScreen">
+        <h2>Bem-vindo ao Chat</h2>
+        <input id="loginUsername" placeholder="Digite seu nome ou continue como guest" />
+        <button id="loginBtn">Entrar</button>
+    </div>
+  <div class="app" id="chatApp" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
       <h3 style="margin:0">Chat Realtime - Test</h3>
       <div class="controls">

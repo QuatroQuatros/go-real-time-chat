@@ -1,3 +1,33 @@
+const loginScreen = document.getElementById('loginScreen');
+const loginUsernameEl = document.getElementById('loginUsername');
+const usernameEl = document.getElementById('username');
+const loginBtn = document.getElementById('loginBtn');
+const chatApp = document.getElementById('chatApp');
+
+let username = null;
+
+// Gera um guest aleatório
+function generateGuestName() {
+    return 'Guest' + Math.floor(Math.random() * 10000);
+}
+
+loginBtn.addEventListener('click', () => {
+    const name = loginUsernameEl.value.trim();
+    username = name || generateGuestName();
+
+    localStorage.setItem('chatUsername', username);
+
+    // Esconde login e mostra chat
+    loginScreen.style.display = 'none';
+    chatApp.style.display = 'block';
+
+    // Preenche input e status
+    usernameEl.value = username;
+
+    // Conecta automaticamente
+    wsConnect();
+});
+
 (() => {
     const serverUrlEl = document.getElementById('serverUrl');
     const roomInputEl = document.getElementById('roomInput');
@@ -15,7 +45,13 @@
     let ws = null;
     let connected = false;
     let currentRoom = 'general';
-    let username = 'TestUser';
+
+    const roomsMap = {
+        general: 1,
+        random: 2,
+        games: 3,
+        support: 4
+    };
 
     // default values
     serverUrlEl.value = 'ws://localhost:8080/ws';
@@ -45,21 +81,38 @@
         messagesEl.innerHTML = '';
     }
 
+
+    function fetchRoomHistory(roomName) {
+        const roomId = roomsMap[roomName];
+        fetch(`/rooms/${roomId}/messages?limit=50`)
+            .then(r => {
+                if (!r.ok) throw new Error('Falha ao carregar histórico: ' + r.status);
+                return r.json();
+            })
+            .then(data => {
+                clearMessages();
+                (data || []).forEach(m => {
+                    const user_id = m.User?.Username ?? m.UserID ?? m.user ?? 'unk';
+                    const content = m.Content ?? m.content ?? JSON.stringify(m);
+                    const timestamp = m.CreatedAt ?? m.created_at ?? new Date().toISOString();
+                    addMessage({ user_id, content, timestamp }, false);
+                });
+            })
+            .catch(err => console.error(err));
+    }
+
     function wsConnect() {
         if (connected) return;
         const url = serverUrlEl.value.trim();
         if (!url) return alert('Informe a URL do WebSocket (ex: ws://localhost:8080/ws)');
 
-        // attach room param to url if not present
-        const r = roomInputEl.value.trim() || currentRoom;
-        currentRoom = r;
-        currentRoomEl.textContent = currentRoom;
 
-        // optional: send token via ?token=... if your server requires auth
+        const roomId = roomsMap[currentRoom];
         const sep = url.includes('?') ? '&' : '?';
-        const full = `${url}${sep}room=${encodeURIComponent(currentRoom)}`;
+        const fullUrl = `${url}${sep}room=${roomId}`;
+
         try {
-            ws = new WebSocket(full);
+            ws = new WebSocket(fullUrl);
         } catch (err) {
             console.error(err);
             return alert('Falha ao criar WebSocket: ' + err.message);
@@ -70,26 +123,32 @@
             connectBtn.style.display = 'none';
             disconnectBtn.style.display = 'inline-block';
             setStatus('sim');
-            console.log('WS aberto em', full);
-            // optionally announce join
-            // const joinMsg = { type: 'message', room: currentRoom, content: `${usernameEl.value || username} entrou na sala` };
-            const joinMsg = { RoomID: 1, Content: `${usernameEl.value || username} entrou na sala` };
-            ws.send(JSON.stringify(joinMsg));
+            console.log('WS aberto em', fullUrl);
+
+            // Mensagem de join
+            ws.send(JSON.stringify({
+                RoomID: roomId,
+                Content: `${usernameEl.value || username} entrou na sala`
+            }));
+
+            //fetchRoomHistory(currentRoom);
         };
 
         ws.onmessage = (ev) => {
             try {
                 const data = JSON.parse(ev.data);
                 console.log('msg recv', data);
-                // server uses OutgoingMessage { type, room, user_id, content, timestamp }
-                if (data.type === 'message' && data.room === currentRoom) {
-                    addMessage({ user_id: data.user_id ?? data.user, content: data.content, timestamp: data.timestamp }, false);
-                } else {
-                    // generic dump
-                    addMessage({ user_id: data.user_id ?? 'srv', content: JSON.stringify(data).slice(0, 200), timestamp: new Date().toISOString() });
+
+                // filtrar por sala
+                if (data.RoomID === roomsMap[currentRoom]) {
+                    addMessage({
+                        user_id: data.user_id ?? data.UserID ?? data.user ?? 'srv',
+                        content: data.Content ?? data.content ?? '',
+                        timestamp: data.CreatedAt ?? data.created_at ?? new Date().toISOString()
+                    }, false);
                 }
             } catch (e) {
-                console.warn('msg parse fail', e);
+                console.warn('Erro ao processar mensagem WS', e);
             }
         };
 
@@ -108,29 +167,26 @@
 
     function wsDisconnect() {
         if (!ws) return;
-        try {
-            ws.close();
-        } catch (e) { /* ignore */ }
+        const roomId = roomsMap[currentRoom];
+        // Mensagem de saída
+        ws.send(JSON.stringify({
+            RoomID: roomId,
+            Content: `${usernameEl.value || username} desconectou-se da sala`
+        }));
+        ws.close();
         ws = null;
     }
 
     function sendMessage() {
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            return alert('Conecte-se primeiro');
-        }
+        if (!ws || ws.readyState !== WebSocket.OPEN) return alert('Conecte-se primeiro');
         const text = messageInput.value.trim();
         if (!text) return;
-        // const payload = {
-        //     type: 'message',
-        //     room: currentRoom,
-        //     content: text
-        // };
+        const roomId = roomsMap[currentRoom];
         const payload = {
-            RoomID: 1,
+            RoomID: roomId,
             Content: text
         };
         ws.send(JSON.stringify(payload));
-        // optimistically render as "me" (server may echo with user_id)
         addMessage({ user_id: usernameEl.value || username, content: text, timestamp: new Date().toISOString() }, true);
         messageInput.value = '';
     }
@@ -140,7 +196,7 @@
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
 
-    // room switching via sidebar
+    // Troca de sala
     roomsListEl.addEventListener('click', (ev) => {
         const node = ev.target.closest('.room');
         if (!node) return;
@@ -152,44 +208,15 @@
         roomInputEl.value = room;
         currentRoomEl.textContent = room;
         clearMessages();
-        // reconnect automatically if already connected
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            // simple approach: close and reconnect to change ?room param
-            ws.close();
+        // Se estiver conectado, desconecta e reconecta na nova sala
+        if (connected) {
+            wsDisconnect();
             setTimeout(wsConnect, 200);
         }
     });
 
-    // fetch history
-    fetchHistoryBtn.addEventListener('click', () => {
-        const base = window.location.origin.replace(/^http/, 'http');
-        const apiBase = base; // ex: http://localhost:8080
-        const room = roomInputEl.value.trim() || currentRoom;
-        const limit = 50;
-        const url = `${apiBase}/rooms/${encodeURIComponent(room)}/messages?limit=${limit}`;
-        fetch(url)
-            .then(r => {
-                if (!r.ok) throw new Error('failed: ' + r.status);
-                return r.json();
-            })
-            .then(data => {
-                clearMessages();
-                // expects array of messages [{User, UserID, Content, CreatedAt,...}]
-                (data || []).forEach(m => {
-                    // adapt to your response shape: try several possibilities
-                    const user_id = m.User?.Username ?? m.UserID ?? m.user_id ?? m.user ?? m.username ?? 'unk';
-                    const content = m.Content ?? m.content ?? m.content_text ?? JSON.stringify(m);
-                    const timestamp = m.CreatedAt ?? m.created_at ?? m.timestamp ?? new Date().toISOString();
-                    addMessage({ user_id, content, timestamp }, false);
-                });
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Falha ao carregar histórico: ' + err.message);
-            });
-    });
-
-    // quick connect on enter in room input
-    roomInputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') wsConnect(); });
+    // Botão histórico
+    fetchHistoryBtn.addEventListener('click', () => fetchRoomHistory(currentRoom));
+    roomInputEl.addEventListener('keydown', e => { if (e.key === 'Enter') wsConnect(); });
 
 })();
