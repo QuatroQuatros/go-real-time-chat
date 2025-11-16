@@ -1,7 +1,6 @@
-# Real-Time Chat - Kubernetes Local Setup
+# Real-Time Chat - Kubernetes Local Setup (Kind/Docker Desktop)
 
-Este guia explica como subir a aplicação localmente usando Kubernetes, incluindo
-Deployment, Service, Ingress Controller e configuração de host local.
+Este guia explica como subir a aplicação localmente usando Kubernetes **Kind** (Kubernetes in Docker), incluindo Deployment, Service, Ingress Controller e configuração de host local.
 
 > ⚠️ A aplicação ainda está em desenvolvimento.
 Isso significa que falhas, comportamentos inesperados, interrupções e instabilidades podem ocorrer com frequência.
@@ -14,10 +13,9 @@ Use este projeto apenas para fins de estudo, testes locais e experimentação.
 
 Antes de tudo, instale:
 
-- Docker
-- kubectl
-- Minikube (ou outro cluster local como Kind ou K3d)
-- Ingress Controller NGINX (instalado no cluster)
+- **Docker Desktop** (com Kubernetes ativado)
+- **kubectl**
+- **Kind** (para criar o cluster)
 
 Verifique o cluster:
 
@@ -25,16 +23,27 @@ Verifique o cluster:
 
 ---
 
-## 2. Build da imagem local
+## 2. Build e Carregamento da Imagem
 
-A imagem da aplicação deve ser criada localmente e carregada no Minikube:
+A imagem da aplicação deve ser criada e carregada no Kind.
 
-    eval $(minikube docker-env)
+1. **Build da imagem local:**
+
+    ```bash
     docker build -t real-time-chat:v2 .
+    ```
 
-Confirme:
+2. **Carregue a imagem para o cluster Kind:**
 
+    ```bash
+    kind load docker-image real-time-chat:v2
+    ```
+
+    Confirme:
+
+    ```bash
     docker images | grep real-time-chat
+    ```
 
 ---
 
@@ -45,16 +54,16 @@ A aplicação usa Postgres. Antes suba um Deployment e Service do banco.
 Depois, confirme que o pod está funcionando:
 
     kubectl get pods
-    kubectl logs -f <pod-do-postgres>
+    kubectl logs -f ./kubernets/postgres/deploymentsey.yaml
 
 ---
 
-## 4. Subir a aplicação
+## 4. Subir a Aplicação
 
 Aplique os manifestos:
 
-    kubectl apply -f deployment.yaml
-    kubectl apply -f service.yaml
+    kubectl apply -f ./kubernets/api/deploymentset.yaml
+    kubectl apply -f ./kubernets/api/chat-service.yaml
 
 Verifique:
 
@@ -63,27 +72,33 @@ Verifique:
 
 ---
 
-## 5. Instalar o Ingress Controller NGINX
+## 5. Instalar e Configurar o Ingress Controller NGINX (Kind)
 
-Execute:
+O Kind requer a instalação manual do Ingress Controller.
 
-    minikube addons enable ingress
+1. **Instale o Ingress Controller:**
 
-Verifique se o controller subiu:
+    ```bash
+    kubectl apply -f [https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml](https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml)
+    ```
 
+2. **Verifique se o controller subiu:**
+
+    ```bash
     kubectl get pods -n ingress-nginx
+    ```
 
-Procure por algo como:
-
-    ingress-nginx-controller   Running
+    Procure por algo como: `ingress-nginx-controller   Running`
 
 ---
 
-## 6. Criar o Ingress
+## 6. Criar o Ingress (com Regras de WebSocket)
 
 Aplique o arquivo:
 
     kubectl apply -f ingress.yaml
+
+> **Ajuste Importante:** Sua aplicação Go serve o frontend na raiz e já está respondendo corretamente. O Ingress abaixo roteará o tráfego da raiz e do WebSocket.
 
 Para verificar:
 
@@ -91,32 +106,53 @@ Para verificar:
 
 ---
 
-## 7. Configurar o /etc/hosts
+## 7. Configurar o Acesso Local (Port Forwarding)
 
-Adicione esta linha no arquivo de hosts:
+Como você usa o Kind, o `LoadBalancer` não é acessível diretamente pelo IP externo. Usaremos o **Port Forwarding** para fazer a ponte para a porta 80 do seu host.
 
+1. **Encontre o nome do Pod do Ingress Controller:**
+
+    ```bash
+    kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller
+    ```
+
+2. **Abra um terminal NOVO e execute o Port Forwarding (mantenha-o rodando):**
+    > **Atenção:** Se não funcionar, tente executar o terminal como Administrador.
+
+    ```bash
+    kubectl port-forward -n ingress-nginx <nome-do-pod-do-ingress> 80:80
+    ```
+
+3. **Configure o /etc/hosts (Windows/Linux/macOS):**
+    Adicione esta linha no seu arquivo de hosts para que `chat.com` aponte para o *localhost*:
+
+    ```
     127.0.0.1   chat.com
+    ```
 
-Depois limpe o cache DNS (Windows):
+4. **Limpe o cache DNS (Windows):**
 
+    ```bash
     ipconfig /flushdns
-
-No Linux/macOS:
-
-    sudo dscacheutil -flushcache
-    sudo systemctl restart systemd-resolved
+    ```
 
 ---
 
-## 8. Acessar a aplicação
+## 8. Acessar a Aplicação
 
-Agora basta acessar no navegador:
+Agora basta acessar no navegador ou via `curl`. O Ingress Controller na porta 80 (via `port-forward`) irá rotear para sua aplicação.
 
-    http://chat.com/
+- **Acesso ao Frontend (Rota Raiz):**
 
-Se quiser testar via curl:
+    ```
+    [http://chat.com/](http://chat.com/)
+    ```
 
-    curl http://chat.com/
+- **Teste de Health Check:**
+
+    ```bash
+    curl [http://chat.com/health](http://chat.com/health)
+    ```
 
 ---
 
@@ -124,10 +160,9 @@ Se quiser testar via curl:
 
 ### A imagem não sobe no pod
 
-Provavelmente o Kubernetes está tentando puxar do Docker Hub.
-Garanta que a flag do Minikube está ativa:
+Provavelmente o Kind não encontrou a imagem localmente. Garanta que a imagem foi carregada:
 
-    eval $(minikube docker-env)
+    kind load docker-image real-time-chat:v2
 
 E recrie o pod:
 
@@ -137,13 +172,16 @@ E recrie o pod:
 
 ### Ingress não funciona
 
-- Verifique se o controller está rodando:
+- **Verifique o `Port Forwarding`:** Certifique-se de que a janela do `kubectl port-forward 80:80` está aberta e ativa.
+- **Verifique o controller:**
 
       kubectl get pods -n ingress-nginx
 
-- Verifique se o Ingress pegou o endereço IP:
+- **Verifique o Ingress:**
 
       kubectl describe ingress chat-ingress
+
+- **Problemas de WebSockets:** O Ingress Controller precisa de configurações específicas para conexões longas de WebSockets (que já estão nas *Annotations* do seu manifesto).
 
 ---
 
