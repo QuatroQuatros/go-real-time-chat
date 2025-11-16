@@ -41,8 +41,9 @@ func main() {
 	// Seed Rooms
 	rooms := []domain.Room{
 		{Name: "Geral", CreatedAt: time.Now()},
-		{Name: "Tech", CreatedAt: time.Now()},
 		{Name: "Random", CreatedAt: time.Now()},
+		{Name: "Games", CreatedAt: time.Now()},
+		{Name: "Support", CreatedAt: time.Now()},
 	}
 
 	for _, r := range rooms {
