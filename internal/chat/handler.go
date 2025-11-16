@@ -17,7 +17,12 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func ServeWs(hub *Hub, user *domain.User, msgRepo repository.MessageRepository, w http.ResponseWriter, r *http.Request) {
+func ServeWs(hub *Hub, user *domain.User, roomID uint, msgRepo repository.MessageRepository, w http.ResponseWriter, r *http.Request) {
+
+	// Cria/pega o RoomHub da sala
+	roomHub := hub.GetRoomHub(roomID)
+
+	// Upgrade para WebSocket
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("❌ Failed to upgrade:", err)
@@ -30,12 +35,13 @@ func ServeWs(hub *Hub, user *domain.User, msgRepo repository.MessageRepository, 
 		User: user,
 	}
 
-	hub.Register <- conn
+	// Registra a conexão na sala
+	roomHub.Register <- conn
 
-	// Leitura de mensagens
+	// --- Leitura de mensagens ---
 	go func() {
 		defer func() {
-			hub.Unregister <- conn
+			roomHub.Unregister <- conn
 			ws.Close()
 		}()
 		for {
@@ -45,8 +51,9 @@ func ServeWs(hub *Hub, user *domain.User, msgRepo repository.MessageRepository, 
 				break
 			}
 
-			// Adiciona usuário e timestamp
+			// Adiciona usuário, sala e timestamp
 			msg.UserID = user.ID
+			msg.RoomID = roomID
 			msg.CreatedAt = msg.CreatedAt.UTC()
 
 			// Salva no banco
@@ -55,11 +62,12 @@ func ServeWs(hub *Hub, user *domain.User, msgRepo repository.MessageRepository, 
 				continue
 			}
 
-			hub.Broadcast <- &msg
+			// Envia para broadcast na sala correta
+			roomHub.Broadcast <- &msg
 		}
 	}()
 
-	// Escrita de mensagens
+	// --- Escrita de mensagens ---
 	go func() {
 		for message := range conn.Send {
 			if err := ws.WriteJSON(message); err != nil {
