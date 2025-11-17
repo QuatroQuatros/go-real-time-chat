@@ -1,12 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/QuatroQuatros/go-real-time-chat/config"
 	"github.com/QuatroQuatros/go-real-time-chat/infra/db"
@@ -14,6 +12,8 @@ import (
 	"github.com/QuatroQuatros/go-real-time-chat/internal/domain"
 	"github.com/QuatroQuatros/go-real-time-chat/internal/repository"
 	"github.com/QuatroQuatros/go-real-time-chat/web"
+	"github.com/gin-contrib/static"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -28,28 +28,41 @@ func main() {
 
 	hub := chat.NewHub()
 
-	mux := http.NewServeMux()
+	r := gin.Default()
+
 	// ------------------------------
 	// 🔥 Serve arquivos estáticos
 	// ------------------------------
-	mux.Handle("/", http.FileServer(http.FS(web.StaticFS)))
+
+	fs, err := static.EmbedFolder(web.StaticFS, ".")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r.Use(static.Serve("/", fs))
+
+	r.NoRoute(func(c *gin.Context) {
+		fmt.Printf("%s doesn't exists, redirect on /\n", c.Request.URL.Path)
+		c.Redirect(http.StatusMovedPermanently, "/")
+	})
 
 	// ------------------------------
 	// Rotas da API
 	// ------------------------------
 
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
+	api := r.Group("/api")
+
+	api.GET("/health", func(c *gin.Context) {
+		c.String(http.StatusOK, "OK")
 	})
 
-	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		username := r.URL.Query().Get("username")
+	api.GET("/ws", func(c *gin.Context) {
+		username := c.Query("username")
 		if username == "" {
 			username = "Guest"
 		}
 
-		roomParam := r.URL.Query().Get("room")
+		roomParam := c.Query("room")
 		if roomParam == "" {
 			roomParam = "general"
 		}
@@ -72,32 +85,25 @@ func main() {
 			Username: username,
 		}
 
-		chat.ServeWs(hub, user, roomID, msgRepo, w, r)
+		chat.ServeWs(hub, user, roomID, msgRepo, c.Writer, c.Request)
 	})
 
-	mux.HandleFunc("/rooms/", func(w http.ResponseWriter, r *http.Request) {
-		// URL esperada: /rooms/{roomName}/messages
-		path := r.URL.Path
-		parts := strings.Split(path, "/")
-		if len(parts) < 4 || parts[3] != "messages" {
-			http.NotFound(w, r)
-			return
-		}
+	api.GET("/rooms/:roomID/messages", func(c *gin.Context) {
+		roomIDStr := c.Param("roomID")
 
-		roomIDStr := parts[2]
 		roomID, err := strconv.ParseUint(roomIDStr, 10, 32)
 		if err != nil {
-			http.Error(w, "ID da sala inválido", http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"eror": "ID da sala inválido"})
 			return
 		}
 
 		room, err := roomRepo.GetByID(uint(roomID))
 		if err != nil {
-			http.Error(w, "Sala não encontrada", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"eror": "Sala não encontrada"})
 			return
 		}
 
-		limitStr := r.URL.Query().Get("limit")
+		limitStr := c.Query("limit")
 		limit := 50
 		if limitStr != "" {
 			if l, err := strconv.Atoi(limitStr); err == nil {
@@ -107,7 +113,7 @@ func main() {
 
 		msgs, err := msgRepo.GetByRoom(room.ID)
 		if err != nil {
-			http.Error(w, "Erro ao buscar mensagens", http.StatusInternalServerError)
+			c.JSON(http.StatusInternalServerError, gin.H{"eror": "Erro ao buscar mensagens"})
 			return
 		}
 
@@ -115,14 +121,13 @@ func main() {
 			msgs = msgs[len(msgs)-limit:]
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(msgs)
+		c.JSON(http.StatusOK, msgs)
 	})
 
 	addr := fmt.Sprintf(":%s", config.Env.ServerPort)
 	log.Printf("🚀 Server running on %s", addr)
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := r.Run(addr); err != nil {
 		log.Fatalf("❌ Server failed: %v", err)
 	}
 }
