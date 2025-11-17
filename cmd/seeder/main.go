@@ -8,6 +8,8 @@ import (
 	"github.com/QuatroQuatros/go-real-time-chat/infra/db"
 	"github.com/QuatroQuatros/go-real-time-chat/internal/domain"
 	"github.com/QuatroQuatros/go-real-time-chat/internal/repository"
+	"github.com/QuatroQuatros/go-real-time-chat/internal/shared"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
@@ -25,9 +27,36 @@ func main() {
 
 	// Seed Users
 	users := []domain.User{
-		{Username: "TestUser", CreatedAt: time.Now()},
-		{Username: "Alice", CreatedAt: time.Now()},
-		{Username: "Bob", CreatedAt: time.Now()},
+		{
+			Username:  "TestUser",
+			Password:  hash("123456"),
+			Guest:     false,
+			LastLogin: time.Now(),
+			AuditInfo: shared.AuditInfo{
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+		},
+		{
+			Username:  "Alice",
+			Password:  hash("senhaAlice"),
+			Guest:     false,
+			LastLogin: time.Now(),
+			AuditInfo: shared.AuditInfo{
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+		},
+		{
+			Username:  "Bob",
+			Password:  hash("senhaBob"),
+			Guest:     false,
+			LastLogin: time.Now(),
+			AuditInfo: shared.AuditInfo{
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+		},
 	}
 
 	for _, u := range users {
@@ -55,4 +84,12 @@ func main() {
 	}
 
 	log.Println("🎉 Seeder finalizado!")
+}
+
+func hash(pwd string) string {
+	h, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatalf("Erro ao fazer hash: %v", err)
+	}
+	return string(h)
 }
